@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  CANTEEN_STAFF
+  KITCHEN_STAFF
+  VENDOR
+  STAFF
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           Role     @default(STAFF)
+  phone          String?
+  department     String?
+  dietaryPrefs   String[] // VEGETARIAN, VEGAN, HALAL, GLUTEN_FREE
+  walletBalance  Decimal  @default(0) @db.Decimal(10, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders      Order[]
+  mealPlans   MealPlan[]
+  walletTxns  WalletTransaction[]
+  collections DeliveryCollection[]
+}
+
+// ─── Menu ─────────────────────────────────────────────────────────────────────
+
+model MenuCategory {
+  id        String     @id @default(cuid())
+  name      String
+  sortOrder Int        @default(0)
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal      @db.Decimal(10, 2)
+  categoryId  String
+  category    MenuCategory @relation(fields: [categoryId], references: [id])
+  imageUrl    String?
+  isAvailable Boolean      @default(true)
+  allergens   String[]
+  calories    Int?
+  protein     Decimal?     @db.Decimal(6, 2)
+  carbs       Decimal?     @db.Decimal(6, 2)
+  fat         Decimal?     @db.Decimal(6, 2)
+  prepMins    Int          @default(15)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  dailyMenuItems DailyMenuItem[]
+  orderItems     OrderItem[]
+  mealPlanItems  MealPlanItem[]
+}
+
+model DailyMenu {
+  id          String          @id @default(cuid())
+  date        DateTime        @db.Date
+  isPublished Boolean         @default(false)
+  items       DailyMenuItem[]
+
+  @@unique([date])
+}
+
+model DailyMenuItem {
+  id        String    @id @default(cuid())
+  menuId    String
+  menu      DailyMenu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      MenuItem  @relation(fields: [itemId], references: [id])
+  available Int       @default(100)
+  sold      Int       @default(0)
+
+  @@unique([menuId, itemId])
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+enum OrderType {
+  CANTEEN
+  WALK_IN
+  DESK
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  COLLECTED
+  CANCELLED
+}
+
+enum PaymentMode {
+  WALLET
+  CASH
+  CARD
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNo     String      @unique
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  type        OrderType   @default(CANTEEN)
+  status      OrderStatus @default(PENDING)
+  pickupTime  DateTime?
+  notes       String?
+  subtotal    Decimal     @db.Decimal(10, 2)
+  total       Decimal     @db.Decimal(10, 2)
+  paidAt      DateTime?
+  paymentMode PaymentMode @default(WALLET)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items         OrderItem[]
+  kitchenTicket KitchenTicket?
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      MenuItem @relation(fields: [itemId], references: [id])
+  qty       Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  notes     String?
+  lineTotal Decimal  @db.Decimal(10, 2)
+}
+
+// ─── Kitchen ──────────────────────────────────────────────────────────────────
+
+enum TicketStatus {
+  QUEUED
+  PREPARING
+  DONE
+  SERVED
+}
+
+model KitchenTicket {
+  id        String       @id @default(cuid())
+  orderId   String       @unique
+  order     Order        @relation(fields: [orderId], references: [id])
+  status    TicketStatus @default(QUEUED)
+  startedAt DateTime?
+  doneAt    DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+// ─── Meal Planner ─────────────────────────────────────────────────────────────
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model MealPlan {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id])
+  weekStart DateTime       @db.Date
+  items     MealPlanItem[]
+  createdAt DateTime       @default(now())
+
+  @@unique([userId, weekStart])
+}
+
+model MealPlanItem {
+  id         String    @id @default(cuid())
+  planId     String
+  plan       MealPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int
+  mealType   MealType
+  itemId     String?
+  item       MenuItem? @relation(fields: [itemId], references: [id])
+  customName String?
+  calories   Int?
+}
+
+// ─── Deliveries ───────────────────────────────────────────────────────────────
+
+enum DeliveryStatus {
+  EXPECTED
+  PARTIAL
+  RECEIVED
+  CANCELLED
+}
+
+model Vendor {
+  id         String     @id @default(cuid())
+  name       String
+  contact    String?
+  phone      String?
+  email      String?
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  deliveries Delivery[]
+}
+
+model Delivery {
+  id           String         @id @default(cuid())
+  deliveryNo   String         @unique
+  vendorId     String
+  vendor       Vendor         @relation(fields: [vendorId], references: [id])
+  expectedDate DateTime       @db.Date
+  receivedAt   DateTime?
+  status       DeliveryStatus @default(EXPECTED)
+  notes        String?
+  createdAt    DateTime       @default(now())
+  items        DeliveryItem[]
+}
+
+model DeliveryItem {
+  id          String               @id @default(cuid())
+  deliveryId  String
+  delivery    Delivery             @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  name        String
+  unit        String               @default("pcs")
+  expectedQty Decimal              @db.Decimal(10, 3)
+  receivedQty Decimal              @default(0) @db.Decimal(10, 3)
+  notes       String?
+  collections DeliveryCollection[]
+}
+
+model DeliveryCollection {
+  id          String       @id @default(cuid())
+  itemId      String
+  item        DeliveryItem @relation(fields: [itemId], references: [id])
+  collectedBy String
+  collector   User         @relation(fields: [collectedBy], references: [id])
+  qty         Decimal      @db.Decimal(10, 3)
+  collectedAt DateTime     @default(now())
+  purpose     String?
+}
+
+// ─── Wallet ───────────────────────────────────────────────────────────────────
+
+enum WalletTxType {
+  TOPUP
+  DEDUCTION
+  REFUND
+  ADJUSTMENT
+}
+
+model WalletTransaction {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  type      WalletTxType
+  amount    Decimal      @db.Decimal(10, 2)
+  balAfter  Decimal      @db.Decimal(10, 2)
+  ref       String?
+  note      String?
+  orderId   String?
+  createdAt DateTime     @default(now())
+}

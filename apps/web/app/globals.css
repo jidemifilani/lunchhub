@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary:    #DC2626;
+  --color-secondary:  #F87171;
+  --color-accent:     #A16207;
+  --color-background: #FEF2F2;
+  --color-foreground: #450A0A;
+  --color-card:       #FFFFFF;
+  --color-muted:      #F0EDF1;
+  --color-muted-fg:   #475569;
+  --color-border:     #FECACA;
+}
+
+body {
+  font-family: 'Karla', sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+h1, h2, h3 { font-family: 'Playfair Display SC', serif; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: fadeInUp 0.35s ease both; }
+.stagger-1  { animation-delay: 0.06s; }
+.stagger-2  { animation-delay: 0.12s; }
+.stagger-3  { animation-delay: 0.18s; }
+.stagger-4  { animation-delay: 0.24s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .stagger-1, .stagger-2, .stagger-3, .stagger-4 {
+    animation: none;
+  }
+}
